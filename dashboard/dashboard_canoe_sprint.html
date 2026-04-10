@@ -1,0 +1,929 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Analyse Performance Sprint Canoë-Kayak</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bleu:    #003F88;
+    --rouge:   #C1121F;
+    --or:      #F7B731;
+    --gris0:   #F4F6F9;
+    --gris1:   #E8EBF0;
+    --gris2:   #B0BAC9;
+    --gris3:   #606C80;
+    --vert:    #2D9C5A;
+    --blanc:   #FFFFFF;
+    --texte:   #1A2236;
+    --ombre:   0 2px 12px rgba(0,0,0,.10);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', Arial, sans-serif;
+    background: var(--gris0);
+    color: var(--texte);
+    font-size: 14px;
+  }
+
+  /* ── HEADER ── */
+  header {
+    background: var(--bleu);
+    color: var(--blanc);
+    padding: 18px 32px;
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    box-shadow: 0 2px 8px rgba(0,0,0,.25);
+    position: sticky; top: 0; z-index: 100;
+  }
+  header .flag { font-size: 2rem; }
+  header h1 { font-size: 1.3rem; font-weight: 700; }
+  header p  { font-size: .85rem; opacity: .8; margin-top: 2px; }
+  header .badge {
+    margin-left: auto;
+    background: var(--or);
+    color: var(--bleu);
+    font-weight: 700;
+    font-size: .8rem;
+    padding: 5px 14px;
+    border-radius: 20px;
+  }
+
+  /* ── UPLOAD ZONE ── */
+  #upload-zone {
+    margin: 30px auto;
+    max-width: 680px;
+    background: var(--blanc);
+    border: 2px dashed var(--gris2);
+    border-radius: 12px;
+    padding: 40px 30px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color .2s, background .2s;
+  }
+  #upload-zone:hover { border-color: var(--bleu); background: #EEF3FA; }
+  #upload-zone .icon { font-size: 3rem; margin-bottom: 12px; }
+  #upload-zone h2 { font-size: 1.1rem; color: var(--bleu); margin-bottom: 6px; }
+  #upload-zone p  { color: var(--gris3); font-size: .88rem; }
+  #upload-zone input[type=file] { display: none; }
+  #upload-btn {
+    margin-top: 18px;
+    background: var(--bleu);
+    color: #fff;
+    border: none;
+    padding: 10px 28px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: .95rem;
+    font-weight: 600;
+  }
+  #upload-btn:hover { background: #00296B; }
+
+  /* ── MAIN CONTENT ── */
+  #dashboard { display: none; padding: 20px 28px 50px; max-width: 1400px; margin: 0 auto; }
+
+  /* ── FILTRES ── */
+  .filters {
+    background: var(--blanc);
+    border-radius: 12px;
+    padding: 18px 24px;
+    margin-bottom: 24px;
+    box-shadow: var(--ombre);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    align-items: flex-end;
+  }
+  .filter-group { display: flex; flex-direction: column; gap: 5px; }
+  .filter-group label { font-size: .8rem; font-weight: 600; color: var(--gris3); text-transform: uppercase; }
+  select, input[type=range] {
+    padding: 7px 12px;
+    border: 1px solid var(--gris2);
+    border-radius: 7px;
+    font-size: .9rem;
+    background: var(--blanc);
+    color: var(--texte);
+    min-width: 140px;
+  }
+  select:focus { outline: 2px solid var(--bleu); border-color: transparent; }
+  .filter-group .range-val { font-size: .8rem; color: var(--bleu); font-weight: 700; text-align: center; }
+
+  /* ── KPI CARDS ── */
+  .kpi-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+  .kpi {
+    background: var(--blanc);
+    border-radius: 12px;
+    padding: 18px 20px;
+    box-shadow: var(--ombre);
+    border-top: 4px solid var(--bleu);
+  }
+  .kpi.rouge { border-color: var(--rouge); }
+  .kpi.vert  { border-color: var(--vert); }
+  .kpi.or    { border-color: var(--or); }
+  .kpi-val   { font-size: 1.9rem; font-weight: 800; color: var(--bleu); }
+  .kpi.rouge .kpi-val { color: var(--rouge); }
+  .kpi.vert  .kpi-val { color: var(--vert); }
+  .kpi.or    .kpi-val { color: #C28000; }
+  .kpi-label { font-size: .78rem; color: var(--gris3); margin-top: 4px; line-height: 1.4; }
+
+  /* ── SECTIONS ── */
+  .section-title {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--bleu);
+    margin: 28px 0 14px;
+    padding-left: 10px;
+    border-left: 4px solid var(--bleu);
+  }
+
+  /* ── GRILLES DE GRAPHIQUES ── */
+  .charts-2col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-bottom: 20px;
+  }
+  .charts-3col {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+    margin-bottom: 20px;
+  }
+  @media (max-width: 1000px) { .charts-2col, .charts-3col { grid-template-columns: 1fr; } }
+
+  .card {
+    background: var(--blanc);
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: var(--ombre);
+  }
+  .card h3 {
+    font-size: .9rem;
+    font-weight: 700;
+    color: var(--gris3);
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    margin-bottom: 16px;
+  }
+  .chart-wrap { position: relative; height: 260px; }
+
+  /* ── TABLEAU ÉCARTS ── */
+  .ecarts-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: .88rem;
+  }
+  .ecarts-table th {
+    background: var(--bleu);
+    color: #fff;
+    padding: 9px 12px;
+    text-align: left;
+    font-weight: 600;
+    font-size: .82rem;
+  }
+  .ecarts-table td {
+    padding: 9px 12px;
+    border-bottom: 1px solid var(--gris1);
+  }
+  .ecarts-table tr:nth-child(even) td { background: var(--gris0); }
+  .ecarts-table .pct-pos { color: var(--rouge); font-weight: 700; }
+  .ecarts-table .pct-neg { color: var(--vert); font-weight: 700; }
+
+  /* ── TABLEAU SEUILS ── */
+  .seuils-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 16px;
+    margin-bottom: 20px;
+  }
+  .seuil-card {
+    background: var(--blanc);
+    border-radius: 10px;
+    padding: 16px 18px;
+    box-shadow: var(--ombre);
+  }
+  .seuil-card h4 { font-size: .85rem; font-weight: 700; color: var(--bleu); margin-bottom: 10px; }
+  .seuil-row { display: flex; justify-content: space-between; align-items: center; padding: 5px 0; border-bottom: 1px solid var(--gris1); font-size: .85rem; }
+  .seuil-row:last-child { border-bottom: none; }
+  .seuil-label { color: var(--gris3); }
+  .seuil-val   { font-weight: 700; color: var(--texte); }
+  .seuil-val.gold   { color: #B8860B; }
+  .seuil-val.silver { color: #607080; }
+  .seuil-val.bronze { color: #A0522D; }
+
+  /* ── TABLEAU FRA ── */
+  #fra-section { display: none; }
+  #fra-upload-zone {
+    background: var(--blanc);
+    border: 2px dashed var(--gris2);
+    border-radius: 10px;
+    padding: 24px;
+    text-align: center;
+    cursor: pointer;
+    margin-bottom: 20px;
+  }
+  #fra-upload-zone:hover { border-color: var(--rouge); background: #FEF2F2; }
+  #fra-upload-zone input { display: none; }
+  #fra-upload-btn {
+    background: var(--rouge);
+    color: #fff;
+    border: none;
+    padding: 9px 24px;
+    border-radius: 7px;
+    cursor: pointer;
+    font-size: .9rem;
+    font-weight: 600;
+    margin-top: 10px;
+  }
+
+  /* ── PIED ── */
+  footer {
+    text-align: center;
+    color: var(--gris2);
+    font-size: .8rem;
+    padding: 30px;
+  }
+
+  .spinner {
+    display: inline-block;
+    width: 18px; height: 18px;
+    border: 3px solid var(--gris1);
+    border-top-color: var(--bleu);
+    border-radius: 50%;
+    animation: spin .6s linear infinite;
+    vertical-align: middle;
+    margin-right: 8px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="flag">🛶</div>
+  <div>
+    <h1>Analyse Performance – Sprint Canoë-Kayak</h1>
+    <p>Finales A · Championnats du Monde &amp; Jeux Olympiques · Senior</p>
+  </div>
+  <div class="badge" id="data-badge">Aucune donnée</div>
+</header>
+
+<!-- ZONE UPLOAD -->
+<div id="upload-zone" onclick="document.getElementById('csv-input').click()">
+  <div class="icon">📂</div>
+  <h2>Charger le fichier CSV de résultats</h2>
+  <p>Glissez-déposez ou cliquez pour sélectionner<br>
+     <code>icf_sprint_finals_A.csv</code> généré par le scraper</p>
+  <button id="upload-btn">Choisir le fichier</button>
+  <input type="file" id="csv-input" accept=".csv">
+</div>
+
+<!-- DASHBOARD -->
+<div id="dashboard">
+
+  <!-- FILTRES -->
+  <div class="filters">
+    <div class="filter-group">
+      <label>Compétition</label>
+      <select id="f-comp" onchange="applyFilters()">
+        <option value="">Toutes</option>
+        <option value="WCh">Championnats du Monde</option>
+        <option value="OG">Jeux Olympiques</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <label>Distance</label>
+      <select id="f-dist" onchange="applyFilters()">
+        <option value="">Toutes</option>
+        <option value="200">200 m</option>
+        <option value="500">500 m</option>
+        <option value="1000">1000 m</option>
+        <option value="5000">5000 m</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <label>Embarcation</label>
+      <select id="f-boat" onchange="applyFilters()">
+        <option value="">Toutes</option>
+        <option value="K1">K1</option>
+        <option value="K2">K2</option>
+        <option value="K4">K4</option>
+        <option value="C1">C1</option>
+        <option value="C2">C2</option>
+        <option value="C4">C4</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <label>Période</label>
+      <input type="range" id="f-year-min" min="2012" max="2025" value="2012" oninput="syncRange('min')">
+      <div class="range-val" id="f-year-min-val">2012</div>
+    </div>
+    <div class="filter-group">
+      <label>&nbsp;</label>
+      <input type="range" id="f-year-max" min="2012" max="2025" value="2025" oninput="syncRange('max')">
+      <div class="range-val" id="f-year-max-val">2025</div>
+    </div>
+    <div class="filter-group">
+      <label>&nbsp;</label>
+      <button onclick="resetFilters()" style="padding:7px 18px;border:1px solid var(--gris2);border-radius:7px;cursor:pointer;background:#fff;font-size:.88rem;">↺ Réinitialiser</button>
+    </div>
+  </div>
+
+  <!-- KPIs -->
+  <div class="kpi-row">
+    <div class="kpi"><div class="kpi-val" id="kpi-athletes">–</div><div class="kpi-label">Finales A analysées<br>(entrées individuelles)</div></div>
+    <div class="kpi rouge"><div class="kpi-val" id="kpi-events">–</div><div class="kpi-label">Épreuves différentes</div></div>
+    <div class="kpi vert"><div class="kpi-val" id="kpi-comps">–</div><div class="kpi-label">Compétitions</div></div>
+    <div class="kpi or"><div class="kpi-val" id="kpi-countries">–</div><div class="kpi-label">Pays représentés<br>en Finale A</div></div>
+  </div>
+
+  <!-- SECTION 1 : ÉCARTS INTER-CATÉGORIES -->
+  <div class="section-title">1 · Écarts de performance entre catégories (% par rapport au K1H)</div>
+  <p style="color:var(--gris3);font-size:.85rem;margin-bottom:14px;padding-left:4px">
+    Référence = temps du vainqueur K1H sur la même distance, même compétition.
+    Médiane calculée sur l'ensemble des vainqueurs de chaque catégorie.
+  </p>
+
+  <div class="charts-2col">
+    <div class="card">
+      <h3>Écart médian K1H vs autres · 500 m</h3>
+      <div class="chart-wrap"><canvas id="chart-ecart-500"></canvas></div>
+    </div>
+    <div class="card">
+      <h3>Écart médian K1H vs autres · 200 m</h3>
+      <div class="chart-wrap"><canvas id="chart-ecart-200"></canvas></div>
+    </div>
+  </div>
+  <div class="charts-2col">
+    <div class="card">
+      <h3>Écart médian K1H vs autres · 1000 m</h3>
+      <div class="chart-wrap"><canvas id="chart-ecart-1000"></canvas></div>
+    </div>
+    <div class="card">
+      <h3>Évolution temporelle de l'écart K1H / K1F · 500 m</h3>
+      <div class="chart-wrap"><canvas id="chart-evolution-hf"></canvas></div>
+    </div>
+  </div>
+
+  <!-- TABLEAU RÉCAPITULATIF ÉCARTS -->
+  <div class="card" style="margin-bottom:20px;">
+    <h3>Tableau récapitulatif – Écart médian au K1H par catégorie et distance</h3>
+    <div style="overflow-x:auto;margin-top:8px">
+      <table class="ecarts-table" id="ecarts-table"></table>
+    </div>
+  </div>
+
+  <!-- SECTION 2 : DISTRIBUTION DES PERFORMANCES -->
+  <div class="section-title">2 · Distribution des temps en Finale A (% d'écart au vainqueur)</div>
+  <div class="charts-2col">
+    <div class="card">
+      <h3>Distribution · K1 Hommes</h3>
+      <div class="chart-wrap"><canvas id="chart-dist-k1h"></canvas></div>
+    </div>
+    <div class="card">
+      <h3>Distribution · K1 Femmes</h3>
+      <div class="chart-wrap"><canvas id="chart-dist-k1f"></canvas></div>
+    </div>
+  </div>
+  <div class="charts-2col">
+    <div class="card">
+      <h3>Distribution · C1 Hommes</h3>
+      <div class="chart-wrap"><canvas id="chart-dist-c1h"></canvas></div>
+    </div>
+    <div class="card">
+      <h3>Distribution · C1 Femmes</h3>
+      <div class="chart-wrap"><canvas id="chart-dist-c1f"></canvas></div>
+    </div>
+  </div>
+
+  <!-- SECTION 3 : SEUILS DE PERFORMANCE -->
+  <div class="section-title">3 · Seuils de performance (Finale A)</div>
+  <p style="color:var(--gris3);font-size:.85rem;margin-bottom:14px;padding-left:4px">
+    Percentiles calculés sur l'ensemble des finalistes A historiques (rangs 1–9).
+    P10 = niveau du top 10%, P25 = top 25%, P50 = médiane.
+  </p>
+  <div class="seuils-grid" id="seuils-grid"></div>
+
+  <!-- SECTION 4 : DONNÉES FRANÇAISES (optionnel) -->
+  <div class="section-title">4 · Positionnement des athlètes français (optionnel)</div>
+  <div id="fra-upload-zone" onclick="document.getElementById('fra-csv-input').click()">
+    <div>📋 Charger les données de sélection française (CSV)</div>
+    <p style="font-size:.82rem;color:var(--gris3);margin-top:6px">
+      Format attendu : <code>athlete, boat_class, gender, distance_m, time_seconds, event_label</code>
+    </p>
+    <button id="fra-upload-btn">Choisir le fichier</button>
+    <input type="file" id="fra-csv-input" accept=".csv">
+  </div>
+  <div id="fra-section">
+    <div class="charts-2col">
+      <div class="card">
+        <h3>Positionnement FRA dans la distribution internationale</h3>
+        <div class="chart-wrap"><canvas id="chart-fra-pos"></canvas></div>
+      </div>
+      <div class="card">
+        <h3>% d'écart FRA vs vainqueur mondial (par épreuve)</h3>
+        <div class="chart-wrap"><canvas id="chart-fra-gap"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<footer>
+  Sources : canoeresults.eu · ICF · Fédération Française de Canoë-Kayak<br>
+  Dashboard généré pour la Direction des Équipes de France
+</footer>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════════════
+//  DATA LAYER
+// ═══════════════════════════════════════════════════════════════════════════
+let rawData   = [];   // toutes les lignes CSV brutes
+let filtered  = [];   // après filtres UI
+let chartObjs = {};   // références Chart.js
+
+// ── Parsing CSV robuste ──────────────────────────────────────────────────
+function parseCSV(text) {
+  const lines = text.trim().split('\n');
+  const headers = lines[0].split(',').map(h => h.trim());
+  return lines.slice(1).map(line => {
+    const vals = line.split(',');
+    const obj = {};
+    headers.forEach((h, i) => { obj[h] = (vals[i] || '').trim(); });
+    obj.year        = parseInt(obj.year)         || 0;
+    obj.distance_m  = parseInt(obj.distance_m)   || 0;
+    obj.rank        = parseInt(obj.rank)         || 0;
+    obj.time_seconds     = parseFloat(obj.time_seconds)      || null;
+    obj.pct_gap_winner   = parseFloat(obj.pct_gap_winner)    || null;
+    obj.pct_gap_K1H_ref  = parseFloat(obj.pct_gap_K1H_ref)  || null;
+    return obj;
+  });
+}
+
+// ── Gestion upload CSV principal ─────────────────────────────────────────
+document.getElementById('csv-input').addEventListener('change', function(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    rawData = parseCSV(ev.target.result);
+    document.getElementById('upload-zone').style.display = 'none';
+    document.getElementById('dashboard').style.display   = 'block';
+    applyFilters();
+  };
+  reader.readAsText(file);
+});
+
+// ── Drag & drop ──────────────────────────────────────────────────────────
+['dragover','dragenter'].forEach(ev => {
+  document.getElementById('upload-zone').addEventListener(ev, e => { e.preventDefault(); e.currentTarget.style.borderColor='var(--bleu)'; });
+});
+document.getElementById('upload-zone').addEventListener('drop', e => {
+  e.preventDefault();
+  const file = e.dataTransfer.files[0];
+  if (file) { const inp = document.getElementById('csv-input'); inp.files = e.dataTransfer.files; inp.dispatchEvent(new Event('change')); }
+});
+
+// ── Upload CSV français ──────────────────────────────────────────────────
+document.getElementById('fra-csv-input').addEventListener('change', function(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const fraData = parseCSV(ev.target.result);
+    document.getElementById('fra-section').style.display = 'block';
+    document.getElementById('fra-upload-zone').style.display = 'none';
+    renderFraCharts(fraData);
+  };
+  reader.readAsText(file);
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  FILTRES
+// ═══════════════════════════════════════════════════════════════════════════
+function syncRange(side) {
+  const min = +document.getElementById('f-year-min').value;
+  const max = +document.getElementById('f-year-max').value;
+  if (side === 'min' && min > max) document.getElementById('f-year-max').value = min;
+  if (side === 'max' && max < min) document.getElementById('f-year-min').value = max;
+  document.getElementById('f-year-min-val').textContent = document.getElementById('f-year-min').value;
+  document.getElementById('f-year-max-val').textContent = document.getElementById('f-year-max').value;
+  applyFilters();
+}
+
+function resetFilters() {
+  document.getElementById('f-comp').value = '';
+  document.getElementById('f-dist').value = '';
+  document.getElementById('f-boat').value = '';
+  document.getElementById('f-year-min').value = 2012;
+  document.getElementById('f-year-max').value = 2025;
+  document.getElementById('f-year-min-val').textContent = '2012';
+  document.getElementById('f-year-max-val').textContent = '2025';
+  applyFilters();
+}
+
+function applyFilters() {
+  const comp  = document.getElementById('f-comp').value;
+  const dist  = document.getElementById('f-dist').value;
+  const boat  = document.getElementById('f-boat').value;
+  const yMin  = +document.getElementById('f-year-min').value;
+  const yMax  = +document.getElementById('f-year-max').value;
+  filtered = rawData.filter(r =>
+    (!comp || r.competition === comp) &&
+    (!dist || r.distance_m  === +dist) &&
+    (!boat || r.boat_class  === boat) &&
+    r.year >= yMin && r.year <= yMax
+  );
+  renderAll();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  STATISTIQUES
+// ═══════════════════════════════════════════════════════════════════════════
+function median(arr) {
+  if (!arr.length) return null;
+  const s = [...arr].sort((a, b) => a - b);
+  const m = Math.floor(s.length / 2);
+  return s.length % 2 ? s[m] : (s[m-1] + s[m]) / 2;
+}
+function percentile(arr, p) {
+  if (!arr.length) return null;
+  const s = [...arr].sort((a, b) => a - b);
+  const i = (p / 100) * (s.length - 1);
+  const lo = Math.floor(i), hi = Math.ceil(i);
+  return s[lo] + (s[hi] - s[lo]) * (i - lo);
+}
+function fmtTime(sec) {
+  if (sec == null) return '–';
+  if (sec >= 60) {
+    const m = Math.floor(sec / 60);
+    const s = (sec % 60).toFixed(3);
+    return `${m}:${s.padStart(6,'0')}`;
+  }
+  return sec.toFixed(3) + 's';
+}
+function fmtPct(v) {
+  if (v == null) return '–';
+  return (v >= 0 ? '+' : '') + v.toFixed(2) + '%';
+}
+
+// ── Calcul des écarts médians vainqueur par catégorie + distance ─────────
+function computeGapK1H(data, distance) {
+  // Pour chaque (boat_class, gender), médiane du pct_gap_K1H_ref des vainqueurs
+  const cats = ['K1','K2','K4','C1','C2','C4'];
+  const genders = ['H','F'];
+  const result = [];
+
+  const ref = data.filter(r => r.rank === 1 && r.distance_m === distance && r.boat_class === 'K1' && r.gender === 'H');
+  if (!ref.length) return [];
+
+  cats.forEach(bc => {
+    genders.forEach(g => {
+      if (bc === 'K1' && g === 'H') return; // référence elle-même
+      const rows = data.filter(r =>
+        r.rank === 1 && r.distance_m === distance &&
+        r.boat_class === bc && r.gender === g &&
+        r.pct_gap_K1H_ref != null
+      );
+      if (!rows.length) return;
+      const med = median(rows.map(r => r.pct_gap_K1H_ref));
+      result.push({ label: `${bc} ${g}`, median: med, n: rows.length });
+    });
+  });
+  // Trier par médiane croissante
+  result.sort((a, b) => a.median - b.median);
+  return result;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  RENDU
+// ═══════════════════════════════════════════════════════════════════════════
+const PALETTE = {
+  'K1 F': '#E63946',
+  'K2 H': '#1D6FA4',
+  'K2 F': '#F4A261',
+  'K4 H': '#2A9D8F',
+  'K4 F': '#A8DADC',
+  'C1 H': '#6A4C93',
+  'C1 F': '#C77DFF',
+  'C2 H': '#457B9D',
+  'C2 F': '#A8C5DA',
+  'C4 H': '#264653',
+  'C4 F': '#B5C7C4',
+};
+
+function destroyChart(id) {
+  if (chartObjs[id]) { chartObjs[id].destroy(); delete chartObjs[id]; }
+}
+
+function renderBarEcarts(canvasId, data, distance) {
+  destroyChart(canvasId);
+  const gaps = computeGapK1H(data, distance);
+  if (!gaps.length) return;
+
+  const ctx = document.getElementById(canvasId);
+  if (!ctx) return;
+
+  chartObjs[canvasId] = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: gaps.map(g => g.label),
+      datasets: [{
+        label: '% écart vs K1H vainqueur',
+        data: gaps.map(g => +g.median.toFixed(3)),
+        backgroundColor: gaps.map(g => PALETTE[g.label] || '#888'),
+        borderWidth: 0,
+        borderRadius: 5,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: ctx => `Médiane : +${ctx.parsed.y.toFixed(2)}% (n=${gaps[ctx.dataIndex].n} vainqueurs)`
+          }
+        }
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          title: { display: true, text: '% écart au K1H', font: { size: 11 } },
+          ticks: { callback: v => '+' + v + '%' }
+        }
+      }
+    }
+  });
+}
+
+function renderEvolutionHF(canvasId, data) {
+  destroyChart(canvasId);
+  const years = [...new Set(data.map(r => r.year))].sort();
+  const dist = 500;
+
+  const seriesK1H = [], seriesK1F = [];
+  years.forEach(y => {
+    const rH = data.find(r => r.year === y && r.rank === 1 && r.boat_class === 'K1' && r.gender === 'H' && r.distance_m === dist);
+    const rF = data.find(r => r.year === y && r.rank === 1 && r.boat_class === 'K1' && r.gender === 'F' && r.distance_m === dist);
+    if (rH && rF) {
+      const gap = (rF.time_seconds - rH.time_seconds) / rH.time_seconds * 100;
+      seriesK1H.push({ x: y, y: 0 });
+      seriesK1F.push({ x: y, y: +gap.toFixed(3) });
+    }
+  });
+
+  const ctx = document.getElementById(canvasId);
+  if (!ctx || !seriesK1F.length) return;
+
+  chartObjs[canvasId] = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: seriesK1F.map(p => p.x),
+      datasets: [
+        {
+          label: 'K1H (référence = 0%)',
+          data: seriesK1H.map(p => p.y),
+          borderColor: '#003F88',
+          backgroundColor: 'rgba(0,63,136,.1)',
+          tension: .3, pointRadius: 4
+        },
+        {
+          label: 'K1F vs K1H',
+          data: seriesK1F.map(p => p.y),
+          borderColor: '#E63946',
+          backgroundColor: 'rgba(230,57,70,.1)',
+          tension: .3, pointRadius: 4, fill: true
+        }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y >= 0 ? '+' : ''}${ctx.parsed.y.toFixed(2)}%` } } },
+      scales: {
+        y: { title: { display: true, text: '% vs K1H' }, ticks: { callback: v => v + '%' } }
+      }
+    }
+  });
+}
+
+function renderDistribution(canvasId, data, boat_class, gender) {
+  destroyChart(canvasId);
+  const dists = [200, 500, 1000].filter(d => {
+    return data.some(r => r.boat_class === boat_class && r.gender === gender && r.distance_m === d && r.pct_gap_winner != null);
+  });
+  if (!dists.length) return;
+
+  const datasets = dists.map(d => {
+    const vals = data
+      .filter(r => r.boat_class === boat_class && r.gender === gender && r.distance_m === d && r.pct_gap_winner != null)
+      .map(r => +r.pct_gap_winner.toFixed(3));
+    return {
+      label: `${d} m (n=${vals.length})`,
+      data: vals,
+      type: 'scatter',
+      pointRadius: 4,
+      pointBackgroundColor: d === 200 ? '#E63946' : d === 500 ? '#003F88' : '#2A9D8F',
+    };
+  });
+
+  // Ajouter lignes percentiles
+  const allVals = data.filter(r => r.boat_class === boat_class && r.gender === gender && r.pct_gap_winner != null).map(r => r.pct_gap_winner);
+  const p50 = median(allVals);
+
+  const ctx = document.getElementById(canvasId);
+  if (!ctx) return;
+
+  chartObjs[canvasId] = new Chart(ctx, {
+    data: {
+      datasets: [
+        ...datasets,
+        {
+          type: 'line',
+          label: `Médiane = +${p50 ? p50.toFixed(2) : '–'}%`,
+          data: allVals.length ? [{ x: 1, y: p50 }, { x: 9, y: p50 }] : [],
+          borderColor: '#F7B731',
+          borderDash: [5,4],
+          pointRadius: 0,
+          borderWidth: 2
+        }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { tooltip: { callbacks: { label: ctx => `Rang ${Math.round(ctx.parsed.x)} : +${ctx.parsed.y.toFixed(2)}%` } } },
+      scales: {
+        x: { type: 'linear', min: 0.5, max: 9.5, title: { display: true, text: 'Rang en Finale A' },
+             ticks: { stepSize: 1, callback: v => `${v}e` } },
+        y: { title: { display: true, text: '% écart au vainqueur' }, ticks: { callback: v => '+' + v + '%' } }
+      }
+    }
+  });
+}
+
+function renderEcartsTable(data) {
+  const dists = [200, 500, 1000];
+  const cats = [
+    { bc: 'K1', g: 'F' }, { bc: 'K2', g: 'H' }, { bc: 'K2', g: 'F' },
+    { bc: 'K4', g: 'H' }, { bc: 'K4', g: 'F' },
+    { bc: 'C1', g: 'H' }, { bc: 'C1', g: 'F' },
+    { bc: 'C2', g: 'H' }, { bc: 'C2', g: 'F' },
+    { bc: 'C4', g: 'H' }, { bc: 'C4', g: 'F' },
+  ];
+  const tbl = document.getElementById('ecarts-table');
+  let html = `<tr><th>Catégorie</th>${dists.map(d => `<th>${d} m (écart médian)</th>`).join('')}<th>Nb. éditions</th></tr>`;
+  // Ligne K1H = référence
+  html += `<tr><td><strong>K1 H</strong> <span style="font-size:.75rem;color:var(--gris3)">(référence)</span></td>${dists.map(() => '<td>+0.00%</td>').join('')}<td>–</td></tr>`;
+
+  cats.forEach(({ bc, g }) => {
+    html += `<tr><td><strong>${bc} ${g}</strong></td>`;
+    dists.forEach(d => {
+      const rows = data.filter(r => r.rank === 1 && r.distance_m === d && r.boat_class === bc && r.gender === g && r.pct_gap_K1H_ref != null);
+      const med  = median(rows.map(r => r.pct_gap_K1H_ref));
+      const cls  = med != null ? (med > 5 ? 'pct-pos' : '') : '';
+      html += `<td class="${cls}">${med != null ? fmtPct(+med.toFixed(2)) : '–'}</td>`;
+    });
+    const n = [...new Set(data.filter(r => r.rank === 1 && r.boat_class === bc && r.gender === g).map(r => `${r.year}-${r.competition}`))].length;
+    html += `<td>${n || '–'}</td></tr>`;
+  });
+
+  tbl.innerHTML = html;
+}
+
+function renderSeuils(data) {
+  const cats = [
+    { bc: 'K1', g: 'H', label: 'K1 Hommes' },
+    { bc: 'K1', g: 'F', label: 'K1 Femmes' },
+    { bc: 'C1', g: 'H', label: 'C1 Hommes' },
+    { bc: 'C1', g: 'F', label: 'C1 Femmes' },
+  ];
+  const dists = [500, 1000, 200];
+  let html = '';
+
+  cats.forEach(({ bc, g, label }) => {
+    dists.forEach(d => {
+      const rows = data.filter(r => r.boat_class === bc && r.gender === g && r.distance_m === d && r.time_seconds);
+      if (!rows.length) return;
+      const times = rows.map(r => r.time_seconds);
+      const win   = times.filter((_, i) => rows[i].rank === 1);
+      html += `
+      <div class="seuil-card">
+        <h4>🏅 ${label} · ${d} m (n=${rows.length})</h4>
+        <div class="seuil-row"><span class="seuil-label">🥇 Mieux historique (P10)</span><span class="seuil-val gold">${fmtTime(percentile(times, 10))}</span></div>
+        <div class="seuil-row"><span class="seuil-label">Vainqueur médian</span><span class="seuil-val">${fmtTime(median(win))}</span></div>
+        <div class="seuil-row"><span class="seuil-label">Seuil Finale A (8e rang)</span><span class="seuil-val">${fmtTime(percentile(times.filter((_, i) => rows[i].rank <= 8), 100))}</span></div>
+        <div class="seuil-row"><span class="seuil-label">Médiane Finale A</span><span class="seuil-val">${fmtTime(median(times))}</span></div>
+        <div class="seuil-row"><span class="seuil-label">9e rang médian</span><span class="seuil-val">${fmtTime(median(times.filter((_, i) => rows[i].rank === 9)))}</span></div>
+      </div>`;
+    });
+  });
+  document.getElementById('seuils-grid').innerHTML = html;
+}
+
+function updateKPIs(data) {
+  document.getElementById('kpi-athletes').textContent  = data.length.toLocaleString('fr');
+  document.getElementById('kpi-events').textContent    = [...new Set(data.map(r => r.event_label))].length;
+  document.getElementById('kpi-comps').textContent     = [...new Set(data.map(r => `${r.year}-${r.competition}`))].length;
+  document.getElementById('kpi-countries').textContent = [...new Set(data.map(r => r.country))].length;
+
+  const yMin = Math.min(...data.map(r => r.year));
+  const yMax = Math.max(...data.map(r => r.year));
+  document.getElementById('data-badge').textContent = `${yMin}–${yMax} · ${data.length} lignes`;
+}
+
+function renderAll() {
+  updateKPIs(filtered);
+  renderBarEcarts('chart-ecart-500',  filtered, 500);
+  renderBarEcarts('chart-ecart-200',  filtered, 200);
+  renderBarEcarts('chart-ecart-1000', filtered, 1000);
+  renderEvolutionHF('chart-evolution-hf', filtered);
+  renderDistribution('chart-dist-k1h', filtered, 'K1', 'H');
+  renderDistribution('chart-dist-k1f', filtered, 'K1', 'F');
+  renderDistribution('chart-dist-c1h', filtered, 'C1', 'H');
+  renderDistribution('chart-dist-c1f', filtered, 'C1', 'F');
+  renderEcartsTable(filtered);
+  renderSeuils(filtered);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  SECTION FRANÇAISE
+// ═══════════════════════════════════════════════════════════════════════════
+function renderFraCharts(fraData) {
+  // Pour chaque athlète français, calculer son % par rapport aux seuils historiques
+  const ctx1 = document.getElementById('chart-fra-pos');
+  const ctx2 = document.getElementById('chart-fra-gap');
+  if (!ctx1 || !ctx2) return;
+
+  // Associer les temps FRA aux seuils internationaux
+  const labels = [], gapVals = [], posVals = [];
+
+  fraData.forEach(r => {
+    const intl = filtered.filter(d =>
+      d.boat_class === r.boat_class &&
+      d.gender     === r.gender &&
+      d.distance_m === +r.distance_m &&
+      d.time_seconds
+    );
+    if (!intl.length || !r.time_seconds) return;
+
+    const winnerTimes = intl.filter(d => d.rank === 1).map(d => d.time_seconds);
+    const medWin = median(winnerTimes);
+    if (!medWin) return;
+
+    const gap  = (r.time_seconds - medWin) / medWin * 100;
+    const rank = intl.filter(d => d.time_seconds <= r.time_seconds).length;
+    const pct  = rank / intl.length * 100;
+
+    labels.push(`${r.athlete || r.boat_class+' '+r.gender} · ${r.distance_m}m`);
+    gapVals.push(+gap.toFixed(2));
+    posVals.push(+(100 - pct).toFixed(1));
+  });
+
+  destroyChart('chart-fra-gap');
+  chartObjs['chart-fra-gap'] = new Chart(ctx2, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: '% écart vs vainqueur médian mondial',
+        data: gapVals,
+        backgroundColor: gapVals.map(v => v > 5 ? '#E63946' : v > 2 ? '#F7B731' : '#2D9C5A'),
+        borderRadius: 4,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: { y: { ticks: { callback: v => v + '%' } } }
+    }
+  });
+
+  destroyChart('chart-fra-pos');
+  chartObjs['chart-fra-pos'] = new Chart(ctx1, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: '% de finalistes mondiaux battus',
+        data: posVals,
+        backgroundColor: '#003F88',
+        borderRadius: 4,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: { y: { min: 0, max: 100, ticks: { callback: v => v + '%' } } }
+    }
+  });
+}
+</script>
+</body>
+</html>

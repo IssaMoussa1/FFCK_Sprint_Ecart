@@ -1,0 +1,19 @@
+# Environnement Python
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+
+# Données sensibles (sélections françaises) — à gérer séparément
+data/french/
+
+# Données traitées (recalculables depuis raw)
+data/processed/
+
+# Fichiers système
+.DS_Store
+Thumbs.db
+
+# Éditeurs
+.vscode/
+.idea/
