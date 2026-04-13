@@ -13,6 +13,7 @@ import csv
 import time
 import requests
 from bs4 import BeautifulSoup
+from datetime import date
 
 # ─── CONFIGURATION ────────────────────────────────────────────────────────────
 
@@ -38,7 +39,7 @@ EVENTS = [
 ]
 
 BASE_URL = "http://www.canoeresults.eu/view-results/sprint"
-OUTPUT_FILE = "icf_sprint_finals_A.csv"
+OUTPUT_FILE = f"data/raw/icf_sprint_finals_A_{date.today()}.csv"
 
 # ─── PARSING ──────────────────────────────────────────────────────────────────
 
@@ -81,7 +82,10 @@ def parse_event_label(label: str):
     boat_class = f"{boat_type}{crew_size}"   # K1, K2, C1, etc.
     gender     = {"men": "H", "women": "F", "mix": "MIX"}.get(gender_raw, gender_raw)
     try:
-        distance = int(dist_raw)
+        # Supprimer les séparateurs de milliers (point ET virgule)
+        # ex: "1.000" ou "1,000" → "1000", "5.000" → "5000"
+        dist_clean = re.sub(r'[.,]', '', dist_raw)
+        distance = int(dist_clean)
     except ValueError:
         distance = None
     return boat_class, gender, distance

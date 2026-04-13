@@ -367,7 +367,28 @@
       <div class="chart-wrap"><canvas id="chart-ecart-1000"></canvas></div>
     </div>
     <div class="card">
-      <h3>Évolution temporelle de l'écart K1H / K1F · 500 m</h3>
+      <h3>Évolution temporelle de l'écart entre catégories · 500 m</h3>
+      <div style="margin-bottom:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <label style="font-size:.8rem;font-weight:600;color:var(--gris3)">COMPARER :</label>
+        <select id="evo-cat-ref" onchange="renderEvolutionHF('chart-evolution-hf', filtered)" style="min-width:90px;padding:5px 8px;font-size:.85rem;border:1px solid var(--gris2);border-radius:6px">
+          <option value="K1-H">K1 H</option>
+          <option value="C1-H">C1 H</option>
+        </select>
+        <span style="color:var(--gris3);font-size:.85rem">vs</span>
+        <select id="evo-cat-cmp" onchange="renderEvolutionHF('chart-evolution-hf', filtered)" style="min-width:90px;padding:5px 8px;font-size:.85rem;border:1px solid var(--gris2);border-radius:6px">
+          <option value="K1-F">K1 F</option>
+          <option value="C1-H">C1 H</option>
+          <option value="C1-F">C1 F</option>
+          <option value="K2-H">K2 H</option>
+          <option value="K2-F">K2 F</option>
+          <option value="C2-H">C2 H</option>
+        </select>
+        <select id="evo-dist" onchange="renderEvolutionHF('chart-evolution-hf', filtered)" style="min-width:90px;padding:5px 8px;font-size:.85rem;border:1px solid var(--gris2);border-radius:6px">
+          <option value="500">500 m</option>
+          <option value="200">200 m</option>
+          <option value="1000">1000 m</option>
+        </select>
+      </div>
       <div class="chart-wrap"><canvas id="chart-evolution-hf"></canvas></div>
     </div>
   </div>
@@ -677,7 +698,7 @@ function renderBarEcarts(canvasId, data, distance) {
         y: {
           beginAtZero: true,
           title: { display: true, text: '% écart au K1H', font: { size: 11 } },
-          ticks: { callback: v => '+' + v + '%' }
+          ticks: { callback: v => '+' + (+v).toFixed(2) + '%' }
         }
       }
     }
@@ -686,49 +707,58 @@ function renderBarEcarts(canvasId, data, distance) {
 
 function renderEvolutionHF(canvasId, data) {
   destroyChart(canvasId);
-  const years = [...new Set(data.map(r => r.year))].sort();
-  const dist = 500;
 
-  const seriesK1H = [], seriesK1F = [];
+  const [bcRef, gRef] = (document.getElementById('evo-cat-ref')?.value || 'K1-H').split('-');
+  const [bcCmp, gCmp] = (document.getElementById('evo-cat-cmp')?.value || 'K1-F').split('-');
+  const dist = +(document.getElementById('evo-dist')?.value || 500);
+
+  const years = [...new Set(data.map(r => r.year))].sort();
+  const labelRef = `${bcRef} ${gRef}`;
+  const labelCmp = `${bcCmp} ${gCmp}`;
+
+  const ptsRef = [], ptsCmp = [];
   years.forEach(y => {
-    const rH = data.find(r => r.year === y && r.rank === 1 && r.boat_class === 'K1' && r.gender === 'H' && r.distance_m === dist);
-    const rF = data.find(r => r.year === y && r.rank === 1 && r.boat_class === 'K1' && r.gender === 'F' && r.distance_m === dist);
-    if (rH && rF) {
-      const gap = (rF.time_seconds - rH.time_seconds) / rH.time_seconds * 100;
-      seriesK1H.push({ x: y, y: 0 });
-      seriesK1F.push({ x: y, y: +gap.toFixed(3) });
+    const rRef = data.find(r => r.year===y && r.rank===1 && r.boat_class===bcRef && r.gender===gRef && r.distance_m===dist);
+    const rCmp = data.find(r => r.year===y && r.rank===1 && r.boat_class===bcCmp && r.gender===gCmp && r.distance_m===dist);
+    if (rRef && rCmp) {
+      const gap = (rCmp.time_seconds - rRef.time_seconds) / rRef.time_seconds * 100;
+      ptsRef.push({ x: y, y: 0 });
+      ptsCmp.push({ x: y, y: +gap.toFixed(3) });
     }
   });
 
   const ctx = document.getElementById(canvasId);
-  if (!ctx || !seriesK1F.length) return;
+  if (!ctx || !ptsCmp.length) return;
 
   chartObjs[canvasId] = new Chart(ctx, {
     type: 'line',
     data: {
-      labels: seriesK1F.map(p => p.x),
+      labels: ptsCmp.map(p => p.x),
       datasets: [
         {
-          label: 'K1H (référence = 0%)',
-          data: seriesK1H.map(p => p.y),
-          borderColor: '#003F88',
-          backgroundColor: 'rgba(0,63,136,.1)',
+          label: `${labelRef} (référence = 0%)`,
+          data: ptsRef.map(p => p.y),
+          borderColor: '#003F88', backgroundColor: 'rgba(0,63,136,.1)',
           tension: .3, pointRadius: 4
         },
         {
-          label: 'K1F vs K1H',
-          data: seriesK1F.map(p => p.y),
-          borderColor: '#E63946',
-          backgroundColor: 'rgba(230,57,70,.1)',
+          label: `${labelCmp} vs ${labelRef}`,
+          data: ptsCmp.map(p => p.y),
+          borderColor: '#E63946', backgroundColor: 'rgba(230,57,70,.1)',
           tension: .3, pointRadius: 4, fill: true
         }
       ]
     },
     options: {
       responsive: true, maintainAspectRatio: false,
-      plugins: { tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y >= 0 ? '+' : ''}${ctx.parsed.y.toFixed(2)}%` } } },
+      plugins: {
+        tooltip: { callbacks: { label: c => `${c.dataset.label}: ${c.parsed.y >= 0 ? '+' : ''}${c.parsed.y.toFixed(2)}%` } }
+      },
       scales: {
-        y: { title: { display: true, text: '% vs K1H' }, ticks: { callback: v => v + '%' } }
+        y: {
+          title: { display: true, text: `% écart ${labelCmp} vs ${labelRef}` },
+          ticks: { callback: v => (+v).toFixed(2) + '%' }
+        }
       }
     }
   });
@@ -736,53 +766,60 @@ function renderEvolutionHF(canvasId, data) {
 
 function renderDistribution(canvasId, data, boat_class, gender) {
   destroyChart(canvasId);
-  const dists = [200, 500, 1000].filter(d => {
-    return data.some(r => r.boat_class === boat_class && r.gender === gender && r.distance_m === d && r.pct_gap_winner != null);
-  });
+  const DIST_COLORS = { 200: '#E63946', 500: '#003F88', 1000: '#2A9D8F' };
+  const dists = [200, 500, 1000].filter(d =>
+    data.some(r => r.boat_class === boat_class && r.gender === gender && r.distance_m === d && r.pct_gap_winner != null)
+  );
   if (!dists.length) return;
 
   const datasets = dists.map(d => {
-    const vals = data
-      .filter(r => r.boat_class === boat_class && r.gender === gender && r.distance_m === d && r.pct_gap_winner != null)
-      .map(r => +r.pct_gap_winner.toFixed(3));
+    // Chaque point = {x: rang, y: % écart au vainqueur} pour UNE finale donnée
+    // On agrège par rang : médiane de toutes les finales pour ce rang
+    const byRank = {};
+    data.filter(r => r.boat_class === boat_class && r.gender === gender && r.distance_m === d && r.pct_gap_winner != null)
+        .forEach(r => { (byRank[r.rank] = byRank[r.rank] || []).push(r.pct_gap_winner); });
+
+    const points = Object.entries(byRank)
+      .map(([rank, vals]) => ({ x: +rank, y: +median(vals).toFixed(3) }))
+      .sort((a, b) => a.x - b.x);
+
     return {
-      label: `${d} m (n=${vals.length})`,
-      data: vals,
+      label: `${d} m (n finales=${[...new Set(data.filter(r => r.boat_class===boat_class && r.gender===gender && r.distance_m===d).map(r=>`${r.year}-${r.competition}`))].length})`,
+      data: points,
       type: 'scatter',
-      pointRadius: 4,
-      pointBackgroundColor: d === 200 ? '#E63946' : d === 500 ? '#003F88' : '#2A9D8F',
+      showLine: true,
+      pointRadius: 5,
+      borderWidth: 2,
+      borderColor: DIST_COLORS[d] || '#888',
+      backgroundColor: DIST_COLORS[d] || '#888',
+      tension: 0.3,
     };
   });
-
-  // Ajouter lignes percentiles
-  const allVals = data.filter(r => r.boat_class === boat_class && r.gender === gender && r.pct_gap_winner != null).map(r => r.pct_gap_winner);
-  const p50 = median(allVals);
 
   const ctx = document.getElementById(canvasId);
   if (!ctx) return;
 
   chartObjs[canvasId] = new Chart(ctx, {
-    data: {
-      datasets: [
-        ...datasets,
-        {
-          type: 'line',
-          label: `Médiane = +${p50 ? p50.toFixed(2) : '–'}%`,
-          data: allVals.length ? [{ x: 1, y: p50 }, { x: 9, y: p50 }] : [],
-          borderColor: '#F7B731',
-          borderDash: [5,4],
-          pointRadius: 0,
-          borderWidth: 2
-        }
-      ]
-    },
+    data: { datasets },
     options: {
       responsive: true, maintainAspectRatio: false,
-      plugins: { tooltip: { callbacks: { label: ctx => `Rang ${Math.round(ctx.parsed.x)} : +${ctx.parsed.y.toFixed(2)}%` } } },
+      plugins: {
+        tooltip: {
+          callbacks: {
+            label: c => `${c.dataset.label.split(' (')[0]} · Rang ${c.parsed.x} : +${c.parsed.y.toFixed(2)}%`
+          }
+        }
+      },
       scales: {
-        x: { type: 'linear', min: 0.5, max: 9.5, title: { display: true, text: 'Rang en Finale A' },
-             ticks: { stepSize: 1, callback: v => `${v}e` } },
-        y: { title: { display: true, text: '% écart au vainqueur' }, ticks: { callback: v => '+' + v + '%' } }
+        x: {
+          type: 'linear', min: 0.5, max: 9.5,
+          title: { display: true, text: 'Rang en Finale A' },
+          ticks: { stepSize: 1, callback: v => Number.isInteger(v) ? `${v}e` : '' }
+        },
+        y: {
+          title: { display: true, text: '% écart médian au vainqueur' },
+          ticks: { callback: v => '+' + (+v).toFixed(2) + '%' }
+        }
       }
     }
   });
@@ -790,31 +827,60 @@ function renderDistribution(canvasId, data, boat_class, gender) {
 
 function renderEcartsTable(data) {
   const dists = [200, 500, 1000];
-  const cats = [
-    { bc: 'K1', g: 'F' }, { bc: 'K2', g: 'H' }, { bc: 'K2', g: 'F' },
-    { bc: 'K4', g: 'H' }, { bc: 'K4', g: 'F' },
-    { bc: 'C1', g: 'H' }, { bc: 'C1', g: 'F' },
-    { bc: 'C2', g: 'H' }, { bc: 'C2', g: 'F' },
-    { bc: 'C4', g: 'H' }, { bc: 'C4', g: 'F' },
+  const INDIV = [
+    { bc: 'K1', g: 'F', lbl: 'K1 F' },
+    { bc: 'C1', g: 'H', lbl: 'C1 H' },
+    { bc: 'C1', g: 'F', lbl: 'C1 F' },
   ];
-  const tbl = document.getElementById('ecarts-table');
-  let html = `<tr><th>Catégorie</th>${dists.map(d => `<th>${d} m (écart médian)</th>`).join('')}<th>Nb. éditions</th></tr>`;
-  // Ligne K1H = référence
-  html += `<tr><td><strong>K1 H</strong> <span style="font-size:.75rem;color:var(--gris3)">(référence)</span></td>${dists.map(() => '<td>+0.00%</td>').join('')}<td>–</td></tr>`;
+  const COLLECT = [
+    { bc: 'K2', g: 'H', lbl: 'K2 H' },
+    { bc: 'K2', g: 'F', lbl: 'K2 F' },
+    { bc: 'K4', g: 'H', lbl: 'K4 H' },
+    { bc: 'K4', g: 'F', lbl: 'K4 F' },
+    { bc: 'C2', g: 'H', lbl: 'C2 H' },
+    { bc: 'C2', g: 'F', lbl: 'C2 F' },
+    { bc: 'C4', g: 'H', lbl: 'C4 H' },
+    { bc: 'C4', g: 'F', lbl: 'C4 F' },
+  ];
 
-  cats.forEach(({ bc, g }) => {
-    html += `<tr><td><strong>${bc} ${g}</strong></td>`;
-    dists.forEach(d => {
-      const rows = data.filter(r => r.rank === 1 && r.distance_m === d && r.boat_class === bc && r.gender === g && r.pct_gap_K1H_ref != null);
-      const med  = median(rows.map(r => r.pct_gap_K1H_ref));
-      const cls  = med != null ? (med > 5 ? 'pct-pos' : '') : '';
-      html += `<td class="${cls}">${med != null ? fmtPct(+med.toFixed(2)) : '–'}</td>`;
-    });
-    const n = [...new Set(data.filter(r => r.rank === 1 && r.boat_class === bc && r.gender === g).map(r => `${r.year}-${r.competition}`))].length;
-    html += `<td>${n || '–'}</td></tr>`;
-  });
+  const headerRow = `<tr>
+    <th>Catégorie</th>
+    ${dists.map(d => `<th>${d} m<br><small style="font-weight:400;opacity:.8">écart médian vs K1H</small></th>`).join('')}
+    <th>Éditions</th>
+  </tr>`;
 
-  tbl.innerHTML = html;
+  const refRow = `<tr>
+    <td><strong>K1 H</strong> <span style="font-size:.75rem;color:var(--gris3)">(référence)</span></td>
+    ${dists.map(() => '<td>+0.00%</td>').join('')}
+    <td>–</td>
+  </tr>`;
+
+  function buildRows(cats) {
+    return cats.map(({ bc, g, lbl }) => {
+      const cells = dists.map(d => {
+        const rows = data.filter(r => r.rank===1 && r.distance_m===d && r.boat_class===bc && r.gender===g && r.pct_gap_K1H_ref != null);
+        const med = median(rows.map(r => r.pct_gap_K1H_ref));
+        const cls = med != null ? (med > 10 ? 'pct-pos' : '') : '';
+        return `<td class="${cls}">${med != null ? fmtPct(+med.toFixed(2)) : '–'}</td>`;
+      }).join('');
+      const n = [...new Set(data.filter(r => r.rank===1 && r.boat_class===bc && r.gender===g).map(r => `${r.year}-${r.competition}`))].length;
+      return `<tr><td><strong>${lbl}</strong></td>${cells}<td>${n || '–'}</td></tr>`;
+    }).join('');
+  }
+
+  const sepIndiv = `<tr style="background:var(--gris1)">
+    <td colspan="${dists.length+2}" style="padding:7px 12px;font-size:.8rem;font-weight:700;color:var(--bleu);text-transform:uppercase;letter-spacing:.05em">
+      🚣 Bateaux individuels
+    </td>
+  </tr>`;
+  const sepCollect = `<tr style="background:var(--gris1)">
+    <td colspan="${dists.length+2}" style="padding:7px 12px;font-size:.8rem;font-weight:700;color:var(--bleu);text-transform:uppercase;letter-spacing:.05em">
+      🚣🚣 Bateaux collectifs
+    </td>
+  </tr>`;
+
+  document.getElementById('ecarts-table').innerHTML =
+    headerRow + sepIndiv + refRow + buildRows(INDIV) + sepCollect + buildRows(COLLECT);
 }
 
 function renderSeuils(data) {
@@ -829,22 +895,44 @@ function renderSeuils(data) {
 
   cats.forEach(({ bc, g, label }) => {
     dists.forEach(d => {
-      const rows = data.filter(r => r.boat_class === bc && r.gender === g && r.distance_m === d && r.time_seconds);
+      const rows = data.filter(r => r.boat_class===bc && r.gender===g && r.distance_m===d && r.time_seconds);
       if (!rows.length) return;
-      const times = rows.map(r => r.time_seconds);
-      const win   = times.filter((_, i) => rows[i].rank === 1);
+
+      const allTimes   = rows.map(r => r.time_seconds);
+      const winTimes   = rows.filter(r => r.rank===1).map(r => r.time_seconds);
+      const rank8Times = rows.filter(r => r.rank===8).map(r => r.time_seconds);
+      const rank9Times = rows.filter(r => r.rank===9).map(r => r.time_seconds);
+      const n8 = rank8Times.length, n9 = rank9Times.length;
+
       html += `
       <div class="seuil-card">
-        <h4>🏅 ${label} · ${d} m (n=${rows.length})</h4>
-        <div class="seuil-row"><span class="seuil-label">🥇 Mieux historique (P10)</span><span class="seuil-val gold">${fmtTime(percentile(times, 10))}</span></div>
-        <div class="seuil-row"><span class="seuil-label">Vainqueur médian</span><span class="seuil-val">${fmtTime(median(win))}</span></div>
-        <div class="seuil-row"><span class="seuil-label">Seuil Finale A (8e rang)</span><span class="seuil-val">${fmtTime(percentile(times.filter((_, i) => rows[i].rank <= 8), 100))}</span></div>
-        <div class="seuil-row"><span class="seuil-label">Médiane Finale A</span><span class="seuil-val">${fmtTime(median(times))}</span></div>
-        <div class="seuil-row"><span class="seuil-label">9e rang médian</span><span class="seuil-val">${fmtTime(median(times.filter((_, i) => rows[i].rank === 9)))}</span></div>
+        <h4>🏅 ${label} · ${d} m <span style="font-size:.75rem;font-weight:400;color:var(--gris3)">(${rows.length} finalistes sur ${[...new Set(rows.map(r=>`${r.year}-${r.competition}`))].length} éditions)</span></h4>
+        <div class="seuil-row">
+          <span class="seuil-label" title="Médiane des temps des vainqueurs sur toutes les éditions">🥇 Vainqueur médian</span>
+          <span class="seuil-val gold">${fmtTime(median(winTimes))}</span>
+        </div>
+        <div class="seuil-row">
+          <span class="seuil-label" title="10e percentile de TOUS les finalistes A : niveau du top 10% des meilleurs finalistes mondiaux toutes éditions confondues">Top 10% finalistes mondiaux (P10)</span>
+          <span class="seuil-val">${fmtTime(percentile(allTimes, 10))}</span>
+        </div>
+        <div class="seuil-row">
+          <span class="seuil-label" title="25e percentile de TOUS les finalistes A : niveau pour faire partie du quart supérieur des finalistes mondiaux">Top 25% finalistes mondiaux (P25)</span>
+          <span class="seuil-val">${fmtTime(percentile(allTimes, 25))}</span>
+        </div>
+        <div class="seuil-row">
+          <span class="seuil-label" title="Médiane des 8e rangs sur toutes les éditions : temps typiquement nécessaire pour rentrer en Finale A mondiale">Seuil entrée Finale A (8e rang médian)${n8 < 3 ? ' ⚠️' : ''}</span>
+          <span class="seuil-val silver">${n8 ? fmtTime(median(rank8Times)) : '–'}</span>
+        </div>
+        <div class="seuil-row">
+          <span class="seuil-label" title="Médiane des 9e rangs : dernière place de Finale A">9e rang médian (dernier finaliste)${n9 < 3 ? ' ⚠️' : ''}</span>
+          <span class="seuil-val bronze">${n9 ? fmtTime(median(rank9Times)) : '–'}</span>
+        </div>
       </div>`;
     });
   });
-  document.getElementById('seuils-grid').innerHTML = html;
+
+  document.getElementById('seuils-grid').innerHTML = html ||
+    '<p style="color:var(--gris3);padding:20px">Aucune donnée pour la sélection en cours.</p>';
 }
 
 function updateKPIs(data) {
